@@ -8,6 +8,45 @@
 
 constexpr int GRAVITY = 9.81;
 
+class Circle {
+
+public:
+    Circle() {
+        circle.setFillColor(sf::Color::Magenta);
+        circle.setRadius(15.0f);
+    }
+
+    sf::CircleShape& getShape() { return this->circle; }
+
+    sf::Vector2f& getCurrentPosition() { return this->Pos; }
+
+    sf::Vector2f& getCurrentVelocity() { return this->Vel; }
+
+    sf::Vector2f& getCurrentAcceleration() { return this->Accel; }
+
+    float& getMass() { return this->Mass; }
+
+    void setCurrentPosition(sf::Vector2f pos) { this->Pos = pos; }
+
+    void setCurrentVelocity(sf::Vector2f& vel) { this->Vel = vel; }
+
+    void setCurrentAcceleration(sf::Vector2f& accel) { this->Accel = accel; }
+
+    void setMass(float& mass) { this->Mass = mass; }
+
+
+
+private:
+    sf::CircleShape circle;
+
+    sf::Vector2f Pos = { 5, 5 };
+    sf::Vector2f Vel = { 1,1 };
+    sf::Vector2f Accel = { 0, GRAVITY };
+
+    sf::Vector2f Momentum = { 0,0 };
+    float Mass = 1;
+};
+
 
 class Physics {
 
@@ -19,7 +58,7 @@ public:
         NextPosition.x = pos.x + (vel.x * dt) + (0.5 * accel.x * (dt * dt));
         NextPosition.y = pos.y + (vel.y * dt) + (0.5 * accel.y * (dt * dt));
 
-        // debugNextPos(pos, vel, accel, dt, calcNextPos);
+        // debugNextPos(pos, vel, accel, dt, NextPosition);
         return NextPosition;
     }
 
@@ -50,6 +89,27 @@ public:
         return vel2;
     }
 
+    std::pair<sf::Vector2f, sf::Vector2f> VfAfterCollision(float& m1, float& m2, sf::Vector2f& vi1, sf::Vector2f& vi2)
+    {
+        float component = (m1 - m2) / (m1 + m2);
+
+        // vf1 = final velocity vector of object 1...
+        sf::Vector2f vf1;
+        vf1.x = component * vi1.x + (2 * m2) / (m1 + m2) * vi2.x;
+        vf1.y = component * vi1.y + (2 * m2) / (m1 + m2) * vi2.y;
+
+        sf::Vector2f vf2;
+        vf2.x = ((2 * m1) / (m1 + m2) * vi1.x) - (component * vi2.x);
+        vf2.y = ((2 * m1) / (m1 + m2) * vi1.x) - (component * vi2.y);
+
+        std::pair<sf::Vector2f, sf::Vector2f> FinalVelocities;
+
+        FinalVelocities.first = vf1;
+        FinalVelocities.second = vf2;
+
+        return FinalVelocities;
+    }
+
     // Only function which actually changes velocity rather then return a number
     bool isWindowCollision(sf::Vector2f& pos, sf::Vector2f& vel, sf::Vector2f& windowSize) {
         if (pos.x < 5) {
@@ -73,6 +133,49 @@ public:
         }
 
         return false;
+    }
+
+   
+    std::pair<bool, Circle> isCircleCollision(std::vector<Circle> circleObjs, int iterator)
+    {
+        std::pair<bool, Circle> CircleCollision;
+
+
+        for (int i = iterator + 1; i < circleObjs.size(); i++) {
+            // Find the delta distance vector between the two circles
+            sf::Vector2f distance;
+            distance.x = circleObjs[i].getShape().getPosition().x - circleObjs[iterator].getShape().getPosition().x;
+            distance.y = circleObjs[i].getShape().getPosition().y - circleObjs[iterator].getShape().getPosition().y;
+
+            // Magnitude formula (Pythagorean Theorem)
+            float distanceMag = sqrt((distance.x * distance.x) + (distance.y * distance.y));
+
+
+            // If distance between objects is less then there radii added up then they've collided
+            if (distanceMag < (circleObjs[iterator].getShape().getRadius() + circleObjs[i].getShape().getRadius())) {
+                CircleCollision.first = true;
+                CircleCollision.second = circleObjs[i];
+            }
+        }
+
+        //for (int i = 0; i < circleObjs.size(); i++) {
+        //    for (int j = i + 1; j < circleObjs.size(); j++) {
+
+        //        // Find the delta distance vector between the two circles
+        //        sf::Vector2f distance;
+        //        distance.x = circleObjs[j].getShape().getPosition().x - circleObjs[i].getShape().getPosition().x;
+        //        distance.y = circleObjs[j].getShape().getPosition().y - circleObjs[i].getShape().getPosition().y;
+
+        //        // Magnitude formula (Pythagorean Theorem)
+        //        float distanceMag = sqrt((distance.x * distance.x) + (distance.y * distance.y));
+
+        //        // If distance between objects is less then there radii added up then they've collided
+        //        if (distanceMag < (circleObjs[i].getShape().getRadius() + circleObjs[j].getShape().getRadius()))
+        //            return true;
+        //    }
+        //}
+
+        return CircleCollision;
     }
 
 private:
@@ -101,46 +204,11 @@ private:
 
 };
 
-class Circle {
-
-public:
-    Circle() {
-        circle.setFillColor(sf::Color::Magenta);
-        circle.setRadius(5.0f);
-    }
-
-    sf::CircleShape& getShape() { return this->circle; }
-
-    sf::Vector2f& getCurrentPosition() { return this->Pos; }
-
-    sf::Vector2f& getCurrentVelocity() { return this->Vel; }
-
-    sf::Vector2f& getCurrentAcceleration() { return this->Accel; }
-
-    void setCurrentPosition(sf::Vector2f pos) { this->Pos = pos; }
-
-    void setCurrentVelocity(sf::Vector2f& vel) { this->Vel = vel; }
-
-    void setCurrentAcceleration(sf::Vector2f& accel) { this->Accel = accel; }
-
-
-
-private:
-    sf::CircleShape circle;
-
-    sf::Vector2f Pos = { 5, 5 };
-    sf::Vector2f Vel = { 1,1 };
-    sf::Vector2f Accel = { 0, GRAVITY };
-
-    sf::Vector2f Momentum = { 0,0 };
-    float Mass = 5;
-};
-
 
 class ShapeMgr {
 public:
     ShapeMgr() {
-        InitializeCircles(1);
+        InitializeCircles(15);
     }
 
 
@@ -185,12 +253,10 @@ int main()
 
         for (int i = 0; i < shapeMgr.circleObjs.size(); i++)
         {
-            sf::Vector2f nextPos = physics.calcNextPos(shapeMgr.circleObjs[i].getCurrentPosition(), shapeMgr.circleObjs[i].getCurrentVelocity(), shapeMgr.circleObjs[i].getCurrentAcceleration(), dt * 125);
+
+            sf::Vector2f nextPos = physics.calcNextPos(shapeMgr.circleObjs[i].getCurrentPosition(), shapeMgr.circleObjs[i].getCurrentVelocity(), shapeMgr.circleObjs[i].getCurrentAcceleration(), dt * 15);
             shapeMgr.circleObjs[i].getShape().setPosition(nextPos);
             shapeMgr.circleObjs[i].setCurrentPosition(nextPos);
-
-            // sf::Vector2f nextVel = physics.handleWindowCollision(shapeMgr.circleObjs[i].getCurrentPosition(), shapeMgr.circleObjs[i].getCurrentVelocity(), windowSize);
-            // shapeMgr.circleObjs[i].setCurrentVelocity(nextVel);
 
             bool isWindowCollision = physics.isWindowCollision(shapeMgr.circleObjs[i].getCurrentPosition(), shapeMgr.circleObjs[i].getCurrentVelocity(), windowSize);
             if (isWindowCollision) {
@@ -200,10 +266,29 @@ int main()
             sf::Vector2f nextVel = physics.calcNextVel(shapeMgr.circleObjs[i].getCurrentVelocity(), shapeMgr.circleObjs[i].getCurrentAcceleration(), dt);
             shapeMgr.circleObjs[i].setCurrentVelocity(nextVel);
 
+
+            // Check for collisions starting from the current circle (i) and onwards
+            std::pair<bool, Circle> collisionCircle = physics.isCircleCollision(shapeMgr.circleObjs, i);
+
+            if (collisionCircle.first)
+            {
+                
+                // A collision was detected, and 'collisionCircle' points to the collided circle
+                // Calculate the final velocities using VfAfterCollision
+                std::pair<sf::Vector2f, sf::Vector2f> finalVelocities = physics.VfAfterCollision(
+                    shapeMgr.circleObjs[i].getMass(),
+                    collisionCircle.second.getMass(),
+                    shapeMgr.circleObjs[i].getCurrentVelocity(),
+                    collisionCircle.second.getCurrentVelocity()
+                );
+
+                // Set the velocities of the current circle and the collided circle
+                shapeMgr.circleObjs[i].setCurrentVelocity(finalVelocities.first);
+                collisionCircle.second.setCurrentVelocity(finalVelocities.second);
+
+            }
+
         }
-
-        
-
 
         sf::Event event;
         while (window.pollEvent(event))
