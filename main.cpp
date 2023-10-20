@@ -1,5 +1,6 @@
 #include <SFML/Graphics.hpp>
 #include <iostream>
+#include <vector>
 
 // Distance = Pixels
 // Velocity = Pixels/Frame
@@ -7,36 +8,71 @@
 
 constexpr int GRAVITY = 9.81;
 
+
 class Physics {
 
 public:
 
     sf::Vector2f calcNextPos(sf::Vector2f& pos, sf::Vector2f& vel, sf::Vector2f& accel, float dt)
     {
-        sf::Vector2f calcNextPos;
-        calcNextPos.x = pos.x + (vel.x * dt) + (0.5 * accel.x * (dt * dt));
-        calcNextPos.y = pos.y + (vel.y * dt) + (0.5 * accel.y * (dt * dt));
+        sf::Vector2f NextPosition;
+        NextPosition.x = pos.x + (vel.x * dt) + (0.5 * accel.x * (dt * dt));
+        NextPosition.y = pos.y + (vel.y * dt) + (0.5 * accel.y * (dt * dt));
 
         // debugNextPos(pos, vel, accel, dt, calcNextPos);
-        return calcNextPos;
+        return NextPosition;
     }
 
     sf::Vector2f calcNextVel(sf::Vector2f& vel, sf::Vector2f& accel, float dt)
     {
-        sf::Vector2f calcNextVel;
-        calcNextVel.x = vel.x + (accel.x * dt);
-        calcNextVel.y = vel.y + (accel.y * dt);
-        return calcNextVel;
+        sf::Vector2f NextVelocity;
+        NextVelocity.x = vel.x + (accel.x * dt);
+        NextVelocity.y = vel.y + (accel.y * dt);
+        return NextVelocity;
     }
 
-    sf::Vector2f handleWindowCollision(sf::Vector2f& pos, sf::Vector2f& vel, sf::Vector2f& windowSize) {
-        if (pos.x < 5 || pos.x > windowSize.x - 5)
-            vel.x = (-1 * vel.x);
+    sf::Vector2f calcMomentum(float& mass, sf::Vector2f& vel) {
+        sf::Vector2f Momentum;
+        Momentum.x = mass * vel.x;
+        Momentum.y = mass * vel.y;
+        return Momentum;
+    }
 
-        if (pos.y < 5 || pos.y > windowSize.y - 5)
-            vel.y = (-1 * vel.y);
+    sf::Vector2f VfFromMomentum(float& m1, float& m2, sf::Vector2f& iVel1, sf::Vector2f& fVel1, sf::Vector2f& iVel2)
+    {
+        // Conservation of Momentum Formula:
+        //  M1V1i + M2V2i = M1V1f + M2V2f
+        // (M1V1i + M2V2i - M1V1f)/M2 = V2f
 
-        return vel;
+        sf::Vector2f vel2;
+        vel2.x = ((m1 * iVel1.x) + (m2 * iVel2.x) - (m1 * fVel1.x) / m2);
+        vel2.y = ((m1 * iVel1.y) + (m2 * iVel2.y) - (m1 * fVel1.y) / m2);
+        return vel2;
+    }
+
+    // Only function which actually changes velocity rather then return a number
+    bool isWindowCollision(sf::Vector2f& pos, sf::Vector2f& vel, sf::Vector2f& windowSize) {
+        if (pos.x < 5) {
+            vel.x = (abs(vel.x));
+            return true;
+        }
+
+        else if (pos.x > windowSize.x - 5) {
+            vel.x = -(abs(vel.x));
+            return true;
+        }
+
+        else if (pos.y < 5) {
+            vel.y = (abs(vel.y));
+            return true;
+        }
+
+        else if (pos.y > windowSize.y - 5) {
+            vel.y = -(abs(vel.y));
+            return true;
+        }
+
+        return false;
     }
 
 private:
@@ -81,18 +117,46 @@ public:
 
     sf::Vector2f& getCurrentAcceleration() { return this->Accel; }
 
-    void setCurrentPosition(sf::Vector2f& pos) { this->Pos = pos; }
+    void setCurrentPosition(sf::Vector2f pos) { this->Pos = pos; }
 
     void setCurrentVelocity(sf::Vector2f& vel) { this->Vel = vel; }
+
+    void setCurrentAcceleration(sf::Vector2f& accel) { this->Accel = accel; }
 
 
 
 private:
     sf::CircleShape circle;
-    
+
     sf::Vector2f Pos = { 5, 5 };
-    sf::Vector2f Vel = { 2,1 };
-    sf::Vector2f Accel = { 0, GRAVITY};
+    sf::Vector2f Vel = { 1,1 };
+    sf::Vector2f Accel = { 0, GRAVITY };
+
+    sf::Vector2f Momentum = { 0,0 };
+    float Mass = 5;
+};
+
+
+class ShapeMgr {
+public:
+    ShapeMgr() {
+        InitializeCircles(1);
+    }
+
+
+    
+    void InitializeCircles(int amount) {
+        for (int i = 0; i < amount; i++) {
+            float randomX = static_cast<float>(rand() % 800); // Random X position between 0 and 800
+            float randomY = static_cast<float>(rand() % 600); // Random Y position between 0 and 600
+            Circle circle;
+            circle.setCurrentPosition(sf::Vector2f{ randomX, randomY });
+            circleObjs.push_back(circle);
+        }
+    }
+
+public:
+    std::vector<Circle> circleObjs;
 };
 
 
@@ -101,7 +165,7 @@ int main()
 {
     sf::RenderWindow window(sf::VideoMode(1400, 1000), "SFML works!");
 
-    Circle circle;
+
 
     sf::Clock clock;
     float dt = 0.0f;  // Initialize dt
@@ -111,21 +175,34 @@ int main()
 
     sf::Vector2f windowSize = { 1400, 1000 };
     
+    ShapeMgr shapeMgr;
+
 
     while (window.isOpen())
     {
         sf::Time elapsed = clock.restart();
         dt = elapsed.asSeconds();
 
-        sf::Vector2f nextPos = physics.calcNextPos(circle.getCurrentPosition(), circle.getCurrentVelocity(), circle.getCurrentAcceleration(), dt*50);
-        circle.getShape().setPosition(nextPos);
-        circle.setCurrentPosition(nextPos);
+        for (int i = 0; i < shapeMgr.circleObjs.size(); i++)
+        {
+            sf::Vector2f nextPos = physics.calcNextPos(shapeMgr.circleObjs[i].getCurrentPosition(), shapeMgr.circleObjs[i].getCurrentVelocity(), shapeMgr.circleObjs[i].getCurrentAcceleration(), dt * 125);
+            shapeMgr.circleObjs[i].getShape().setPosition(nextPos);
+            shapeMgr.circleObjs[i].setCurrentPosition(nextPos);
 
-        sf::Vector2f nextVel = physics.handleWindowCollision(circle.getCurrentPosition(), circle.getCurrentVelocity(), windowSize);
-        circle.setCurrentVelocity(nextVel);
+            // sf::Vector2f nextVel = physics.handleWindowCollision(shapeMgr.circleObjs[i].getCurrentPosition(), shapeMgr.circleObjs[i].getCurrentVelocity(), windowSize);
+            // shapeMgr.circleObjs[i].setCurrentVelocity(nextVel);
 
-        nextVel = physics.calcNextVel(circle.getCurrentVelocity(), circle.getCurrentAcceleration(), dt);
-        circle.setCurrentVelocity(nextVel);
+            bool isWindowCollision = physics.isWindowCollision(shapeMgr.circleObjs[i].getCurrentPosition(), shapeMgr.circleObjs[i].getCurrentVelocity(), windowSize);
+            if (isWindowCollision) {
+                shapeMgr.circleObjs[i].setCurrentAcceleration(shapeMgr.circleObjs[i].getCurrentAcceleration());
+            }
+
+            sf::Vector2f nextVel = physics.calcNextVel(shapeMgr.circleObjs[i].getCurrentVelocity(), shapeMgr.circleObjs[i].getCurrentAcceleration(), dt);
+            shapeMgr.circleObjs[i].setCurrentVelocity(nextVel);
+
+        }
+
+        
 
 
         sf::Event event;
@@ -136,7 +213,11 @@ int main()
         }
 
         window.clear();
-        window.draw(circle.getShape());
+        for (int i = 0; i < shapeMgr.circleObjs.size(); i++)
+        {
+            window.draw(shapeMgr.circleObjs[i].getShape());
+
+        }
         window.display();
     }
 
