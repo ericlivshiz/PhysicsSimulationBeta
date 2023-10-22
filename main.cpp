@@ -29,7 +29,7 @@ public:
 
     void setCurrentPosition(sf::Vector2f pos) { this->Pos = pos; }
 
-    void setCurrentVelocity(sf::Vector2f& vel) { this->Vel = vel; }
+    void setCurrentVelocity(sf::Vector2f vel) { this->Vel = vel; }
 
     void setCurrentAcceleration(sf::Vector2f accel) { this->Accel = accel; }
 
@@ -41,7 +41,7 @@ private:
     sf::CircleShape circle;
 
     sf::Vector2f Pos = { 5, 5 };
-    sf::Vector2f Vel = { 2,2 };
+    sf::Vector2f Vel;
     sf::Vector2f Accel = { 0, GRAVITY };
 
     sf::Vector2f Momentum = { 0,0 };
@@ -205,7 +205,7 @@ public:
 
         // Initialize random seed
         std::srand(static_cast<unsigned int>(std::time(nullptr)));
-        InitializeCircles(5);
+        InitializeCircles(3);
 
         
     }
@@ -216,9 +216,11 @@ public:
         for (int i = 0; i < amount; i++) {
             float randomX = static_cast<float>(rand() % 800); // Random X position between 0 and 800
             float randomY = static_cast<float>(rand() % 600); // Random Y position between 0 and 600
-            // float randomY = 50;
+            //float randomX = 50;
+            //float randomY = 50;
             Circle circle;
             circle.setCurrentPosition(sf::Vector2f{ randomX, randomY });
+            circle.setCurrentVelocity(sf::Vector2f{ 5,0 });
             circleObjs.push_back(circle);
         }
     }
@@ -238,6 +240,17 @@ public:
 
             // Set the color of the circle
             circleObjs[i].getShape().setFillColor(color);
+        }
+    }
+
+    void randomColor() {
+        for (int i = 0; i < circleObjs.size(); i++)
+        {
+            if (i % 2 == 0)
+                circleObjs[i].getShape().setFillColor(sf::Color::Red);
+            else
+                circleObjs[i].getShape().setFillColor(sf::Color::Blue);
+
         }
     }
 
@@ -281,15 +294,15 @@ int main()
         float deltaTime = frameClock.restart().asSeconds();
         accumulatedTime += deltaTime;
 
+        shapeMgr.randomColor();
+
         while (accumulatedTime >= fixedTimeStep)
         {
             for (int i = 0; i < shapeMgr.circleObjs.size(); i++)
             {
-                // Update your simulation with the fixed time step
-                shapeMgr.colorByVelocity();
-                if (i % 2 == 0) {
-                    shapeMgr.circleObjs[i].setMass(20);
-                }
+                //shapeMgr.colorByVelocity();
+                if (i % 2 == 0)
+                    shapeMgr.circleObjs[i].setMass(30);
 
                 sf::Vector2f nextPos = physics.calcNextPos(
                     shapeMgr.circleObjs[i].getCurrentPosition(),
@@ -297,12 +310,14 @@ int main()
                     shapeMgr.circleObjs[i].getCurrentAcceleration(),
                     fixedTimeStep * 100
                 );
+
                 shapeMgr.circleObjs[i].getShape().setPosition(nextPos);
                 shapeMgr.circleObjs[i].setCurrentPosition(nextPos);
 
                 physics.isWindowCollision(shapeMgr.circleObjs[i].getCurrentPosition(), shapeMgr.circleObjs[i].getCurrentVelocity(), windowSize);
 
                 std::pair<bool, Circle> collisionCircle = physics.isCircleCollision(shapeMgr.circleObjs, i);
+
                 if (collisionCircle.first)
                 {
                     std::pair<sf::Vector2f, sf::Vector2f> finalVelocities = physics.VfAfterCollision(
@@ -312,8 +327,42 @@ int main()
                         collisionCircle.second.getCurrentVelocity()
                     );
 
+
+                    // Update velocity for the object in shapeMgr.circleObjs
+                    int index = -1;
+                    for (int j = 0; j < shapeMgr.circleObjs.size(); j++) {
+                        if (shapeMgr.circleObjs[j].getCurrentPosition() == collisionCircle.second.getCurrentPosition()) {
+                            index = j;
+                            break;
+                        }
+                    }
+
+                    if (index != -1) {
+                        //std::cout << "Object 2 X vel before: " << shapeMgr.circleObjs[index].getCurrentVelocity().x << std::endl << std::endl;
+                        shapeMgr.circleObjs[index].setCurrentVelocity(finalVelocities.second);
+                        shapeMgr.circleObjs[index].setCurrentPosition(collisionCircle.second.getCurrentPosition() + finalVelocities.second);
+                        //std::cout << "Object 2 X vel after: " << shapeMgr.circleObjs[index].getCurrentVelocity().x << std::endl << std::endl;
+
+                    }
+                    //std::cout << " ------------------------------------------------------------------" << std::endl;
+                    //std::cout << "Object 1 X vel before: " << shapeMgr.circleObjs[i].getCurrentVelocity().x << std::endl << std::endl;
+                    //std::cout << "Object 1 Y vel before: " << shapeMgr.circleObjs[i].getCurrentVelocity().y << std::endl << std::endl;
+                    //std::cout << "Object 2 X vel before: " << collisionCircle.second.getCurrentVelocity().x << std::endl << std::endl;
+                    //std::cout << "Object 2 Y vel before: " << collisionCircle.second.getCurrentVelocity().y << std::endl << std::endl;
+                    //std::cout << " ------------------------------------------------------------------" << std::endl;
+
                     shapeMgr.circleObjs[i].setCurrentVelocity(finalVelocities.first);
-                    collisionCircle.second.setCurrentVelocity(finalVelocities.second);
+                    //collisionCircle.second.setCurrentVelocity(finalVelocities.second);
+                    shapeMgr.circleObjs[i].setCurrentPosition(shapeMgr.circleObjs[i].getCurrentPosition() + finalVelocities.first);
+                    //collisionCircle.second.setCurrentPosition(collisionCircle.second.getCurrentPosition() + finalVelocities.second);
+
+                    //std::cout << " ------------------------------------------------------------------" << std::endl;
+                    //std::cout << "Object 1 X vel after: " << shapeMgr.circleObjs[i].getCurrentVelocity().x << std::endl << std::endl;
+                    //std::cout << "Object 1 Y vel after: " << shapeMgr.circleObjs[i].getCurrentVelocity().y << std::endl << std::endl;
+                    //std::cout << "Object 2 X vel after: " << collisionCircle.second.getCurrentVelocity().x << std::endl << std::endl;
+                    //std::cout << "Object 2 Y vel after: " << collisionCircle.second.getCurrentVelocity().y << std::endl << std::endl;
+                    //std::cout << " ---------Whe---------------------------------------------------------" << std::endl;
+                    //std::cout << " ------------------------------------------------------------------" << std::endl;
                 }
 
             }
