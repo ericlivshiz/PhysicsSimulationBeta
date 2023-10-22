@@ -2,7 +2,8 @@
 
 
 10/22/23
-This is a work in progres.
+
+This is a work in progress.
 
 I'm first throwing in some key features this program will need before creating any sort of program architecture.
 
