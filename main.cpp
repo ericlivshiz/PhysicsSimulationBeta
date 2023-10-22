@@ -9,6 +9,10 @@
 
 constexpr int GRAVITY = 9.81;
 
+struct GameState {
+    bool isObjectOnFloor = false;
+};
+
 class Circle {
 
 public:
@@ -53,6 +57,10 @@ class Physics {
 
 public:
 
+    Physics(GameState& gameState)
+        : gameState(gameState)
+    {}
+
     sf::Vector2f calcNextPos(sf::Vector2f& pos, sf::Vector2f& vel, sf::Vector2f& accel, float dt)
     {
         sf::Vector2f NextPosition;
@@ -92,7 +100,7 @@ public:
 
     std::pair<sf::Vector2f, sf::Vector2f> VfAfterCollision(float& m1, float& m2, sf::Vector2f& vi1, sf::Vector2f& vi2)
     {
-
+        
         
         float component = (m1 - m2) / (m1 + m2);
 
@@ -113,20 +121,27 @@ public:
         return FinalVelocities;
     }
 
-    // Only function which actually changes velocity rather then return a number
-    bool isWindowCollision(sf::Vector2f& pos, sf::Vector2f& vel, sf::Vector2f& windowSize) {
-        bool collided = false;
+    sf::Vector2f applyFriction(Circle& circle) {
+        float frictionCoeff = 0.000325;
+        float normalForce = circle.getMass();
+        sf::Vector2f vel = circle.getCurrentVelocity();
+        sf::Vector2f friction = -(vel * normalForce * frictionCoeff);
 
-        // For radius 7, will change later.
-        constexpr int radiusby3 = 45;
+        return friction;
+    }
+
+    // Only function which actually changes velocity rather then return a number
+    bool isWindowCollision(sf::Vector2f& pos, sf::Vector2f& vel, float radius, sf::Vector2f& windowSize) {
+        bool collided = false;
+        int radiusbyconst = radius * 2.35;
 
         if (pos.x < 0) {
             pos.x = 0;
             vel.x = abs(vel.x);  // Reverse the x velocity to bounce off the wall
             collided = true;
         }
-        else if (pos.x + radiusby3 > windowSize.x) {
-            pos.x = windowSize.x - radiusby3;
+        else if (pos.x + radiusbyconst > windowSize.x) {
+            pos.x = windowSize.x - radiusbyconst;
             vel.x = -abs(vel.x);  // Reverse the x velocity to bounce off the wall
             collided = true;
         }
@@ -136,9 +151,10 @@ public:
             vel.y = abs(vel.y);  // Reverse the y velocity to bounce off the ceiling
             collided = true;
         }
-        else if (pos.y + radiusby3 > windowSize.y) {
-            pos.y = windowSize.y - radiusby3;
+        else if (pos.y + radiusbyconst > windowSize.y) {
+            pos.y = windowSize.y - radiusbyconst;
             vel.y = -abs(vel.y);  // Reverse the y velocity to bounce off the floor
+            gameState.isObjectOnFloor = true;
             collided = true;
         }
 
@@ -147,7 +163,7 @@ public:
 
 
    
-    std::pair<bool, Circle> isCircleCollision(std::vector<Circle> circleObjs, int iterator)
+    std::pair<bool, Circle> isCircleCollision(std::vector<Circle>& circleObjs, int& iterator)
     {
         std::pair<bool, Circle> CircleCollision;
 
@@ -167,10 +183,13 @@ public:
                 CircleCollision.first = true;
                 CircleCollision.second = circleObjs[i];
             }
+
         }
 
         return CircleCollision;
     }
+
+
 
 private:
 
@@ -195,6 +214,8 @@ private:
 
         std::cout << std::endl << std::endl;
     }
+
+    GameState& gameState;
 
 };
 
@@ -283,17 +304,17 @@ int main()
 {
     sf::RenderWindow window(sf::VideoMode(1400, 1000), "SFML works!");
 
-
-
     sf::Clock clock;
     float dt = 0.0f;  // Initialize dt
 
+    GameState gameState;
 
-    Physics physics;
+    Physics physics(gameState);
 
     sf::Vector2f windowSize = { 1400, 1000 };
     
     ShapeMgr shapeMgr;
+
 
 
     const float fixedTimeStep = 0.0069444f;  // Target time step (e.g., 144 FPS)
@@ -313,26 +334,32 @@ int main()
             {
                 //shapeMgr.colorByVelocity();
 
+                Circle& currCircle = shapeMgr.circleObjs[i];
+
                 sf::Vector2f nextPos = physics.calcNextPos(
-                    shapeMgr.circleObjs[i].getCurrentPosition(),
-                    shapeMgr.circleObjs[i].getCurrentVelocity(),
-                    shapeMgr.circleObjs[i].getCurrentAcceleration(),
+                    currCircle.getCurrentPosition(),
+                    currCircle.getCurrentVelocity(),
+                    currCircle.getCurrentAcceleration(),
                     fixedTimeStep * 100
                 );
 
-                shapeMgr.circleObjs[i].getShape().setPosition(nextPos);
-                shapeMgr.circleObjs[i].setCurrentPosition(nextPos);
+                currCircle.getShape().setPosition(nextPos);
+                currCircle.setCurrentPosition(nextPos);
 
-                physics.isWindowCollision(shapeMgr.circleObjs[i].getCurrentPosition(), shapeMgr.circleObjs[i].getCurrentVelocity(), windowSize);
+                physics.isWindowCollision(currCircle.getCurrentPosition(), currCircle.getCurrentVelocity(), currCircle.getShape().getRadius(), windowSize);
+ 
+               /* if (gameState.isObjectOnFloor)
+                    currCircle.setCurrentVelocity(currCircle.getCurrentVelocity() + physics.applyFriction(currCircle));*/
 
+                // bool holds true or false for collision, if true then Circle holds the circle that collided with currCircle
                 std::pair<bool, Circle> collisionCircle = physics.isCircleCollision(shapeMgr.circleObjs, i);
 
                 if (collisionCircle.first)
                 {
                     std::pair<sf::Vector2f, sf::Vector2f> finalVelocities = physics.VfAfterCollision(
-                        shapeMgr.circleObjs[i].getMass(),
+                        currCircle.getMass(),
                         collisionCircle.second.getMass(),
-                        shapeMgr.circleObjs[i].getCurrentVelocity(),
+                        currCircle.getCurrentVelocity(),
                         collisionCircle.second.getCurrentVelocity()
                     );
 
@@ -347,31 +374,16 @@ int main()
                     }
 
                     if (index != -1) {
-                        //std::cout << "Object 2 X vel before: " << shapeMgr.circleObjs[index].getCurrentVelocity().x << std::endl << std::endl;
                         shapeMgr.circleObjs[index].setCurrentVelocity(finalVelocities.second);
                         shapeMgr.circleObjs[index].setCurrentPosition(collisionCircle.second.getCurrentPosition() + finalVelocities.second);
-                        //std::cout << "Object 2 X vel after: " << shapeMgr.circleObjs[index].getCurrentVelocity().x << std::endl << std::endl;
 
                     }
-                    //std::cout << " ------------------------------------------------------------------" << std::endl;
-                    //std::cout << "Object 1 X vel before: " << shapeMgr.circleObjs[i].getCurrentVelocity().x << std::endl << std::endl;
-                    //std::cout << "Object 1 Y vel before: " << shapeMgr.circleObjs[i].getCurrentVelocity().y << std::endl << std::endl;
-                    //std::cout << "Object 2 X vel before: " << collisionCircle.second.getCurrentVelocity().x << std::endl << std::endl;
-                    //std::cout << "Object 2 Y vel before: " << collisionCircle.second.getCurrentVelocity().y << std::endl << std::endl;
-                    //std::cout << " ------------------------------------------------------------------" << std::endl;
 
-                    shapeMgr.circleObjs[i].setCurrentVelocity(finalVelocities.first);
-                    //collisionCircle.second.setCurrentVelocity(finalVelocities.second);
-                    shapeMgr.circleObjs[i].setCurrentPosition(shapeMgr.circleObjs[i].getCurrentPosition() + finalVelocities.first);
-                    //collisionCircle.second.setCurrentPosition(collisionCircle.second.getCurrentPosition() + finalVelocities.second);
+                    currCircle.setCurrentVelocity(finalVelocities.first);
+                    currCircle.setCurrentPosition(shapeMgr.circleObjs[i].getCurrentPosition() + finalVelocities.first);
 
-                    //std::cout << " ------------------------------------------------------------------" << std::endl;
-                    //std::cout << "Object 1 X vel after: " << shapeMgr.circleObjs[i].getCurrentVelocity().x << std::endl << std::endl;
-                    //std::cout << "Object 1 Y vel after: " << shapeMgr.circleObjs[i].getCurrentVelocity().y << std::endl << std::endl;
-                    //std::cout << "Object 2 X vel after: " << collisionCircle.second.getCurrentVelocity().x << std::endl << std::endl;
-                    //std::cout << "Object 2 Y vel after: " << collisionCircle.second.getCurrentVelocity().y << std::endl << std::endl;
-                    //std::cout << " ---------Whe---------------------------------------------------------" << std::endl;
-                    //std::cout << " ------------------------------------------------------------------" << std::endl;
+                    
+
                 }
 
             }
