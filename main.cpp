@@ -118,7 +118,7 @@ public:
         bool collided = false;
 
         // For radius 7, will change later.
-        constexpr int radiusby3 = 19;
+        constexpr int radiusby3 = 45;
 
         if (pos.x < 0) {
             pos.x = 0;
@@ -206,8 +206,8 @@ public:
         // Initialize random seed
         std::srand(static_cast<unsigned int>(std::time(nullptr)));
         InitializeCircles(3);
-
-        
+        randomColor();
+        setRadiusByMass();
     }
 
 
@@ -246,12 +246,22 @@ public:
     void randomColor() {
         for (int i = 0; i < circleObjs.size(); i++)
         {
-            if (i % 2 == 0)
-                circleObjs[i].getShape().setFillColor(sf::Color::Red);
-            else
-                circleObjs[i].getShape().setFillColor(sf::Color::Blue);
+            circleObjs[i].getShape().setFillColor(sf::Color(rand() % 255, rand() % 255, rand() % 255));
 
         }
+    }
+
+    void setRadiusByMass() {
+
+        for (int i = 0; i < circleObjs.size(); i++) {
+            if (i % 2 == 0)
+                circleObjs[i].setMass(30);
+            // Set the radius based on mass, you can adjust the factor as needed
+            float mass = circleObjs[i].getMass();
+            float radius = std::sqrt(mass) * 3; // Adjust the factor (5) as needed
+            circleObjs[i].getShape().setRadius(radius);
+        }
+
     }
 
     sf::Color lerp(const sf::Color& start, const sf::Color& end, float t) {
@@ -261,6 +271,7 @@ public:
         return sf::Color(r, g, b);
     }
 
+    
 
 public:
     std::vector<Circle> circleObjs;
@@ -294,15 +305,13 @@ int main()
         float deltaTime = frameClock.restart().asSeconds();
         accumulatedTime += deltaTime;
 
-        shapeMgr.randomColor();
+        //shapeMgr.randomColor();
 
         while (accumulatedTime >= fixedTimeStep)
         {
             for (int i = 0; i < shapeMgr.circleObjs.size(); i++)
             {
                 //shapeMgr.colorByVelocity();
-                if (i % 2 == 0)
-                    shapeMgr.circleObjs[i].setMass(30);
 
                 sf::Vector2f nextPos = physics.calcNextPos(
                     shapeMgr.circleObjs[i].getCurrentPosition(),
